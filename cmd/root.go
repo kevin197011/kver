@@ -9,6 +9,7 @@ import (
 	_ "kver/plugins/go"
 	_ "kver/plugins/python"
 	_ "kver/plugins/ruby"
+	_ "kver/plugins/nodejs"
 )
 
 // KverVersion 由构建时 -ldflags 注入，默认 unknown

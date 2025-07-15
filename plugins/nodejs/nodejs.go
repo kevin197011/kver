@@ -3,7 +3,7 @@
 // This software is released under the MIT License.
 // https://opensource.org/licenses/MIT
 
-package goimpl
+package nodejs
 
 import (
 	"archive/tar"
@@ -11,23 +11,24 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
-	"kver/internal/plugin"
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"sort"
+	"strings"
+
+	"kver/internal/plugin"
 )
 
-type GoPlugin struct{}
+type NodejsPlugin struct{}
 
-func (g *GoPlugin) Name() string { return "go" }
+func (n *NodejsPlugin) Name() string { return "nodejs" }
 
-func (g *GoPlugin) Install(version string) error {
+func (n *NodejsPlugin) Install(version string) error {
 	home, _ := os.UserHomeDir()
 	kverHome := filepath.Join(home, ".kver")
-	installDir := filepath.Join(kverHome, "languages", "go", version)
+	installDir := filepath.Join(kverHome, "languages", "nodejs", version)
 
 	var installOk bool
 	defer func() {
@@ -36,25 +37,33 @@ func (g *GoPlugin) Install(version string) error {
 		}
 	}()
 
-	tmpDir, err := os.MkdirTemp("", "kver-go-src-")
+	tmpDir, err := os.MkdirTemp("", "kver-nodejs-src-")
 	if err != nil {
 		return fmt.Errorf("failed to create temp dir: %w", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
 	title := func(s string) {
-		fmt.Printf("\n\033[1;36m[kver][go] %s\033[0m\n", s)
+		fmt.Printf("\n\033[1;36m[kver][nodejs] %s\033[0m\n", s)
 	}
 	sep := func() {
 		fmt.Println("\033[1;34m----------------------------------------\033[0m")
 	}
 
-	title("Step 1/4: Download Go tarball")
+	title("Step 1/4: Download Node.js tarball")
 	osStr := runtime.GOOS
 	archStr := runtime.GOARCH
-	goTarName := fmt.Sprintf("go%s.%s-%s.tar.gz", version, osStr, archStr)
-	url := fmt.Sprintf("https://go.dev/dl/%s", goTarName)
-	fmt.Printf("[kver][go] Downloading %s\n", url)
+	var nodeArch string
+	switch archStr {
+	case "amd64":
+		nodeArch = "x64"
+	case "arm64":
+		nodeArch = "arm64"
+	default:
+		return fmt.Errorf("unsupported arch: %s", archStr)
+	}
+	url := fmt.Sprintf("https://nodejs.org/dist/v%s/node-v%s-%s-%s.tar.gz", version, version, osStr, nodeArch)
+	fmt.Printf("[kver][nodejs] Downloading %s\n", url)
 	resp, err := http.Get(url)
 	if err != nil {
 		return fmt.Errorf("failed to download: %w", err)
@@ -63,7 +72,7 @@ func (g *GoPlugin) Install(version string) error {
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("download failed: %s", resp.Status)
 	}
-	tarball := filepath.Join(tmpDir, goTarName)
+	tarball := filepath.Join(tmpDir, filepath.Base(url))
 	out, err := os.Create(tarball)
 	if err != nil {
 		return err
@@ -75,31 +84,30 @@ func (g *GoPlugin) Install(version string) error {
 	out.Close()
 	sep()
 
-	title("Step 2/4: Extract Go tarball")
-	if err := g.extractTarGz(tarball, tmpDir); err != nil {
+	title("Step 2/4: Extract Node.js tarball")
+	if err := extractTarGz(tarball, tmpDir); err != nil {
 		return err
 	}
 	sep()
 
-	// 查找解压后的 go 目录
+	// 查找解压后的 node-v* 目录
 	srcDir := ""
 	dirs, _ := os.ReadDir(tmpDir)
 	for _, d := range dirs {
-		if d.IsDir() && d.Name() == "go" {
+		if d.IsDir() && strings.HasPrefix(d.Name(), "node-v") {
 			srcDir = filepath.Join(tmpDir, d.Name())
 			break
 		}
 	}
 	if srcDir == "" {
-		return fmt.Errorf("failed to find extracted go dir")
+		return fmt.Errorf("failed to find extracted nodejs dir")
 	}
 
 	title("Step 3/4: Move to install directory")
 	os.RemoveAll(installDir)
-	// 确保父目录存在
 	os.MkdirAll(filepath.Dir(installDir), 0755)
 	if err := os.Rename(srcDir, installDir); err != nil {
-		return fmt.Errorf("failed to move go dir: %w", err)
+		return fmt.Errorf("failed to move nodejs dir: %w", err)
 	}
 	sep()
 
@@ -112,15 +120,14 @@ func (g *GoPlugin) Install(version string) error {
 		return nil
 	})
 
-	title(fmt.Sprintf("Step 4/4: Go %s installed successfully!", version))
-	fmt.Printf("[kver][go] Installed at: %s\n", installDir)
+	title(fmt.Sprintf("Step 4/4: Node.js %s installed successfully!", version))
+	fmt.Printf("[kver][nodejs] Installed at: %s\n", installDir)
 	sep()
 	installOk = true
 	return nil
 }
 
-// extractTarGz 解压 tar.gz 包到目标目录
-func (g *GoPlugin) extractTarGz(tarball, dest string) error {
+func extractTarGz(tarball, dest string) error {
 	f, err := os.Open(tarball)
 	if err != nil {
 		return err
@@ -141,7 +148,7 @@ func (g *GoPlugin) extractTarGz(tarball, dest string) error {
 			return err
 		}
 		outPath := filepath.Join(dest, hdr.Name)
-		if hdr.Typeflag == tar.TypeDir {
+		if hdr.FileInfo().IsDir() {
 			os.MkdirAll(outPath, 0755)
 			continue
 		}
@@ -159,22 +166,22 @@ func (g *GoPlugin) extractTarGz(tarball, dest string) error {
 	return nil
 }
 
-func (g *GoPlugin) Uninstall(version string) error {
+func (n *NodejsPlugin) Uninstall(version string) error {
 	home, _ := os.UserHomeDir()
 	kverHome := filepath.Join(home, ".kver")
-	installDir := filepath.Join(kverHome, "languages", "go", version)
-	envFile := filepath.Join(kverHome, "env.d", "go.sh")
+	installDir := filepath.Join(kverHome, "languages", "nodejs", version)
+	envFile := filepath.Join(kverHome, "env.d", "nodejs.sh")
 	os.Remove(envFile)
 	if err := os.RemoveAll(installDir); err != nil {
-		return fmt.Errorf("failed to remove go version: %w", err)
+		return fmt.Errorf("failed to remove nodejs version: %w", err)
 	}
-	fmt.Println("[kver] Go", version, "uninstalled.")
+	fmt.Println("[kver] Node.js", version, "uninstalled.")
 	return nil
 }
 
-func (g *GoPlugin) List() ([]string, error) {
+func (n *NodejsPlugin) List() ([]string, error) {
 	home, _ := os.UserHomeDir()
-	base := filepath.Join(home, ".kver", "languages", "go")
+	base := filepath.Join(home, ".kver", "languages", "nodejs")
 	entries, err := os.ReadDir(base)
 	if err != nil {
 		return nil, err
@@ -189,67 +196,59 @@ func (g *GoPlugin) List() ([]string, error) {
 	return versions, nil
 }
 
-func (g *GoPlugin) ListRemote() ([]string, error) {
-	resp, err := http.Get("https://go.dev/dl/")
+func (n *NodejsPlugin) ListRemote() ([]string, error) {
+	resp, err := http.Get("https://nodejs.org/dist/index.tab")
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 	var versions []string
 	scanner := bufio.NewScanner(resp.Body)
-	re := regexp.MustCompile(`go([0-9]+\.[0-9]+\.[0-9]+)\.`)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if m := re.FindStringSubmatch(line); m != nil {
-			versions = append(versions, m[1])
+		if strings.HasPrefix(line, "v") {
+			fields := strings.Fields(line)
+			if len(fields) > 0 {
+				versions = append(versions, strings.TrimPrefix(fields[0], "v"))
+			}
 		}
 	}
-	// 去重
-	verMap := map[string]struct{}{}
-	for _, v := range versions {
-		verMap[v] = struct{}{}
-	}
-	versions = versions[:0]
-	for v := range verMap {
-		versions = append(versions, v)
-	}
-	sort.Strings(versions)
 	return versions, nil
 }
 
-func (g *GoPlugin) Use(version string) error {
+func (n *NodejsPlugin) Use(version string) error {
 	home, _ := os.UserHomeDir()
 	kverHome := filepath.Join(home, ".kver")
-	installDir := filepath.Join(kverHome, "languages", "go", version)
+	installDir := filepath.Join(kverHome, "languages", "nodejs", version)
 	binDir := filepath.Join(installDir, "bin")
 	if _, err := os.Stat(installDir); os.IsNotExist(err) {
-		return fmt.Errorf("go version not installed: %s", version)
+		return fmt.Errorf("nodejs version not installed: %s", version)
 	}
 	envDir := filepath.Join(kverHome, "env.d")
 	os.MkdirAll(envDir, 0755)
-	envFile := filepath.Join(envDir, "go.sh")
+	envFile := filepath.Join(envDir, "nodejs.sh")
 	f, err := os.Create(envFile)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	fmt.Fprintf(f, "export GOROOT=\"%s\"\n", installDir)
+	fmt.Fprintf(f, "export NODEJS_HOME=\"%s\"\n", installDir)
 	fmt.Fprintf(f, "export PATH=\"%s:$PATH\"\n", binDir)
-	fmt.Println("[kver] Now using go", version)
+	fmt.Println("[kver] Now using nodejs", version)
 	fmt.Printf("[kver] Please run: source %s\n", filepath.Join(kverHome, "env.sh"))
 	return nil
 }
 
-func (g *GoPlugin) Global(version string) error {
-	return g.Use(version)
+func (n *NodejsPlugin) Global(version string) error {
+	return n.Use(version)
 }
 
-func (g *GoPlugin) Local(version string, projectDir string) error {
+func (n *NodejsPlugin) Local(version string, projectDir string) error {
 	home, _ := os.UserHomeDir()
 	kverHome := filepath.Join(home, ".kver")
-	installDir := filepath.Join(kverHome, "languages", "go", version)
+	installDir := filepath.Join(kverHome, "languages", "nodejs", version)
 	if _, err := os.Stat(installDir); os.IsNotExist(err) {
-		return fmt.Errorf("go version not installed: %s", version)
+		return fmt.Errorf("nodejs version not installed: %s", version)
 	}
 	localFile := filepath.Join(projectDir, ".kver")
 	f, err := os.OpenFile(localFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
@@ -257,17 +256,17 @@ func (g *GoPlugin) Local(version string, projectDir string) error {
 		return err
 	}
 	defer f.Close()
-	fmt.Fprintf(f, "go = %s\n", version)
-	fmt.Println("[kver] Set local go version to", version)
+	fmt.Fprintf(f, "nodejs = %s\n", version)
+	fmt.Println("[kver] Set local nodejs version to", version)
 	return nil
 }
 
-func (g *GoPlugin) ActivateShell(version string) string {
+func (n *NodejsPlugin) ActivateShell(version string) string {
 	home, _ := os.UserHomeDir()
-	installDir := filepath.Join(home, ".kver", "languages", "go", version)
-	return fmt.Sprintf("export GOROOT=\"%s\"\nexport PATH=\"$GOROOT/bin:$PATH\"\n", installDir)
+	installDir := filepath.Join(home, ".kver", "languages", "nodejs", version)
+	return fmt.Sprintf("export NODEJS_HOME=\"%s\"\nexport PATH=\"$NODEJS_HOME/bin:$PATH\"\n", installDir)
 }
 
 func init() {
-	plugin.Register("go", &GoPlugin{})
+	plugin.Register("nodejs", &NodejsPlugin{})
 }

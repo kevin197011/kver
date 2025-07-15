@@ -234,21 +234,11 @@ func (p *PythonPlugin) Uninstall(version string) error {
 	home, _ := os.UserHomeDir()
 	kverHome := filepath.Join(home, ".kver")
 	installDir := filepath.Join(kverHome, "languages", "python", version)
-	symlink := filepath.Join(kverHome, "versions", "python")
-
-	if _, err := os.Stat(installDir); os.IsNotExist(err) {
-		return fmt.Errorf("python version not installed: %s", version)
-	}
-
-	if link, err := os.Readlink(symlink); err == nil && link == installDir {
-		os.Remove(symlink)
-		os.Remove(filepath.Join(kverHome, "env.sh"))
-	}
-
+	envFile := filepath.Join(kverHome, "env.d", "python.sh")
+	os.Remove(envFile)
 	if err := os.RemoveAll(installDir); err != nil {
 		return fmt.Errorf("failed to remove python version: %w", err)
 	}
-
 	fmt.Println("[kver] Python", version, "uninstalled.")
 	return nil
 }
@@ -294,21 +284,22 @@ func (p *PythonPlugin) Use(version string) error {
 	home, _ := os.UserHomeDir()
 	kverHome := filepath.Join(home, ".kver")
 	installDir := filepath.Join(kverHome, "languages", "python", version)
-	symlink := filepath.Join(kverHome, "versions", "python")
-	os.MkdirAll(filepath.Dir(symlink), 0755)
-	os.Remove(symlink)
-	if err := os.Symlink(installDir, symlink); err != nil {
-		return fmt.Errorf("failed to symlink: %w", err)
+	binDir := filepath.Join(installDir, "bin")
+	if _, err := os.Stat(installDir); os.IsNotExist(err) {
+		return fmt.Errorf("python version not installed: %s", version)
 	}
-	envsh := filepath.Join(kverHome, "env.sh")
-	f, err := os.Create(envsh)
+	envDir := filepath.Join(kverHome, "env.d")
+	os.MkdirAll(envDir, 0755)
+	envFile := filepath.Join(envDir, "python.sh")
+	f, err := os.Create(envFile)
 	if err != nil {
-		return fmt.Errorf("failed to write env.sh: %w", err)
+		return err
 	}
 	defer f.Close()
-	f.WriteString(fmt.Sprintf("export PYTHON_HOME=\"%s\"\nexport PATH=\"$PYTHON_HOME/bin:$PATH\"\n", installDir))
-	fmt.Printf("[kver] Now using python %s.\n", version)
-	fmt.Printf("[kver] Please run: source %s\n", envsh)
+	fmt.Fprintf(f, "export PYTHON_HOME=\"%s\"\n", installDir)
+	fmt.Fprintf(f, "export PATH=\"%s:$PATH\"\n", binDir)
+	fmt.Println("[kver] Now using python", version)
+	fmt.Printf("[kver] Please run: source %s\n", filepath.Join(kverHome, "env.sh"))
 	return nil
 }
 
@@ -317,14 +308,21 @@ func (p *PythonPlugin) Global(version string) error {
 }
 
 func (p *PythonPlugin) Local(version string, projectDir string) error {
-	kverFile := filepath.Join(projectDir, ".kver")
-	f, err := os.Create(kverFile)
+	home, _ := os.UserHomeDir()
+	kverHome := filepath.Join(home, ".kver")
+	installDir := filepath.Join(kverHome, "languages", "python", version)
+	if _, err := os.Stat(installDir); os.IsNotExist(err) {
+		return fmt.Errorf("python version not installed: %s", version)
+	}
+	localFile := filepath.Join(projectDir, ".kver")
+	f, err := os.OpenFile(localFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to write .kver: %w", err)
+		return err
 	}
 	defer f.Close()
-	f.WriteString(fmt.Sprintf("python = %s\n", version))
-	return p.Use(version)
+	fmt.Fprintf(f, "python = %s\n", version)
+	fmt.Println("[kver] Set local python version to", version)
+	return nil
 }
 
 func (p *PythonPlugin) ActivateShell(version string) string {

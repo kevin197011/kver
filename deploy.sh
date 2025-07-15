@@ -43,6 +43,22 @@ mkdir -p "$INSTALL_DIR"
 curl -fsSL "$URL" -o "$INSTALL_DIR/$BIN_NAME"
 chmod +x "$INSTALL_DIR/$BIN_NAME"
 
+# 确保 env.d 目录存在
+mkdir -p "$HOME/.kver/env.d"
+
+# 写入 env.sh 统一 source 机制
+cat > "$HOME/.kver/env.sh" <<'EOF'
+# kver multi-language env loader
+env_d="$HOME/.kver/env.d"
+if [ -d "$env_d" ]; then
+  for f in "$env_d"/*.sh; do
+    [ -f "$f" ] && source "$f"
+  done
+fi
+EOF
+
+echo "[kver] ~/.kver/env.sh updated to load all ~/.kver/env.d/*.sh"
+
 # 自动写入 PATH 到 shell 配置
 SHELL_NAME="$(basename "$SHELL")"
 if [[ "$SHELL_NAME" == "zsh" ]]; then
@@ -51,12 +67,12 @@ else
   RC_FILE="$HOME/.bashrc"
 fi
 
-EXPORT_LINE="export PATH=\"$INSTALL_DIR:\$PATH\""
+EXPORT_LINE="[ -f \"$HOME/.kver/env.sh\" ] && source \"$HOME/.kver/env.sh\""
 if ! grep -Fxq "$EXPORT_LINE" "$RC_FILE" 2>/dev/null; then
   echo "$EXPORT_LINE" >> "$RC_FILE"
-  echo "[kver] Added $INSTALL_DIR to your PATH in $RC_FILE"
+  echo "[kver] Added env.sh source to $RC_FILE"
 else
-  echo "[kver] $INSTALL_DIR already in your PATH in $RC_FILE"
+  echo "[kver] env.sh already sourced in $RC_FILE"
 fi
 
 # 自动写入 kver shell function，彻底防重复且可升级
@@ -74,8 +90,8 @@ cat <<'EOF' >> "$RC_FILE"
 kver() {
   command kver "$@"
   if [[ "$1" == "use" || "$1" == "global" ]]; then
-    if [ -f ~/.kver/env.sh ]; then
-      source ~/.kver/env.sh
+    if [ -f "$HOME/.kver/env.sh" ]; then
+      source "$HOME/.kver/env.sh"
       echo -e "\033[1;32m[kver] 环境已自动激活 (当前 shell)\033[0m"
     fi
   fi
