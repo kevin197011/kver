@@ -106,8 +106,8 @@ func (n *NodejsPlugin) Install(version string) error {
 	title("Step 3/4: Move to install directory")
 	os.RemoveAll(installDir)
 	os.MkdirAll(filepath.Dir(installDir), 0755)
-	if err := os.Rename(srcDir, installDir); err != nil {
-		return fmt.Errorf("failed to move nodejs dir: %w", err)
+	if err := copyDir(srcDir, installDir); err != nil {
+		return fmt.Errorf("failed to copy nodejs dir: %w", err)
 	}
 	sep()
 
@@ -164,6 +164,43 @@ func extractTarGz(tarball, dest string) error {
 		outFile.Close()
 	}
 	return nil
+}
+
+// 递归拷贝目录，保留软链和文件内容
+func copyDir(src, dst string) error {
+	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		tgt := filepath.Join(dst, rel)
+		if info.Mode()&os.ModeSymlink != 0 {
+			link, err := os.Readlink(path)
+			if err != nil {
+				return err
+			}
+			return os.Symlink(link, tgt)
+		}
+		if info.IsDir() {
+			return os.MkdirAll(tgt, info.Mode())
+		}
+		// 普通文件
+		fSrc, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer fSrc.Close()
+		fDst, err := os.OpenFile(tgt, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, info.Mode())
+		if err != nil {
+			return err
+		}
+		defer fDst.Close()
+		_, err = io.Copy(fDst, fSrc)
+		return err
+	})
 }
 
 func (n *NodejsPlugin) Uninstall(version string) error {
