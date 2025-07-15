@@ -101,4 +101,5 @@ EOF
 
 echo "[kver] kver shell function updated in $RC_FILE"
 
-echo "\n[kver] Install complete! Try: kver --help"
+echo
+echo "[kver] Install complete! Try: kver --help"
