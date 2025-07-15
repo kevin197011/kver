@@ -236,7 +236,6 @@ func (g *GoPlugin) Use(version string) error {
 	fmt.Fprintf(f, "export GOROOT=\"%s\"\n", installDir)
 	fmt.Fprintf(f, "export PATH=\"%s:$PATH\"\n", binDir)
 	fmt.Println("[kver] Now using go", version)
-	fmt.Printf("[kver] Please run: source %s\n", filepath.Join(kverHome, "env.sh"))
 	return nil
 }
 

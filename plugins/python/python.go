@@ -299,7 +299,6 @@ func (p *PythonPlugin) Use(version string) error {
 	fmt.Fprintf(f, "export PYTHON_HOME=\"%s\"\n", installDir)
 	fmt.Fprintf(f, "export PATH=\"%s:$PATH\"\n", binDir)
 	fmt.Println("[kver] Now using python", version)
-	fmt.Printf("[kver] Please run: source %s\n", filepath.Join(kverHome, "env.sh"))
 	return nil
 }
 

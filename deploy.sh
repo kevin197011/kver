@@ -92,7 +92,7 @@ kver() {
   if [[ "$1" == "use" || "$1" == "global" ]]; then
     if [ -f "$HOME/.kver/env.sh" ]; then
       source "$HOME/.kver/env.sh"
-      echo -e "\033[1;32m[kver] 环境已自动激活 (当前 shell)\033[0m"
+      echo -e "\033[1;32m[kver] Environment activated (current shell)\033[0m"
     fi
   fi
 }

@@ -296,7 +296,6 @@ func (r *RubyPlugin) Use(version string) error {
 	fmt.Fprintf(f, "export RUBY_HOME=\"%s\"\n", installDir)
 	fmt.Fprintf(f, "export PATH=\"%s:$PATH\"\n", binDir)
 	fmt.Println("[kver] Now using ruby", version)
-	fmt.Printf("[kver] Please run: source %s\n", filepath.Join(kverHome, "env.sh"))
 	return nil
 }
 
