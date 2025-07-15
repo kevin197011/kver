@@ -59,4 +59,30 @@ else
   echo "[kver] $INSTALL_DIR already in your PATH in $RC_FILE"
 fi
 
+# 自动写入 kver shell function，彻底防重复且可升级
+KVER_FUNC_MARK_START='# >>> kver shell function >>>'
+KVER_FUNC_MARK_END='# <<< kver shell function <<<'
+
+# 删除旧区块
+if grep -Fq "$KVER_FUNC_MARK_START" "$RC_FILE" 2>/dev/null; then
+  sed -i "/$KVER_FUNC_MARK_START/,/$KVER_FUNC_MARK_END/d" "$RC_FILE"
+fi
+
+# 追加最新 function
+cat <<'EOF' >> "$RC_FILE"
+# >>> kver shell function >>>
+kver() {
+  command kver "$@"
+  if [[ "$1" == "use" || "$1" == "global" ]]; then
+    if [ -f ~/.kver/env.sh ]; then
+      source ~/.kver/env.sh
+      echo -e "\033[1;32m[kver] 环境已自动激活 (当前 shell)\033[0m"
+    fi
+  fi
+}
+# <<< kver shell function <<<
+EOF
+
+echo "[kver] kver shell function updated in $RC_FILE"
+
 echo "\n[kver] Install complete! Try: kver --help"
