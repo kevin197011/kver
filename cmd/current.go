@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"kver/internal/plugin"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,8 +18,17 @@ var currentCmd = &cobra.Command{
 		if len(args) == 1 {
 			langs = []string{args[0]}
 		} else {
-			for lang := range plugin.All() {
-				langs = append(langs, lang)
+			// 直接从 env.d/*.sh 文件名获取所有已激活语言
+			home, _ := os.UserHomeDir()
+			envDir := filepath.Join(home, ".kver", "env.d")
+			entries, err := os.ReadDir(envDir)
+			if err == nil {
+				for _, e := range entries {
+					if strings.HasSuffix(e.Name(), ".sh") {
+						lang := strings.TrimSuffix(e.Name(), ".sh")
+						langs = append(langs, lang)
+					}
+				}
 			}
 		}
 		cwd, _ := os.Getwd()
@@ -37,15 +45,35 @@ var currentCmd = &cobra.Command{
 			}
 		}
 		home, _ := os.UserHomeDir()
-		globalDir := filepath.Join(home, ".kver", "versions")
+		envDir := filepath.Join(home, ".kver", "env.d")
 		for _, lang := range langs {
 			if v, ok := localMap[lang]; ok {
 				fmt.Printf("%s: %s (local)\n", lang, v)
 				continue
 			}
-			link := filepath.Join(globalDir, lang)
-			if dest, err := os.Readlink(link); err == nil {
-				ver := filepath.Base(dest)
+			envFile := filepath.Join(envDir, lang+".sh")
+			data, err := os.ReadFile(envFile)
+			if err != nil {
+				fmt.Printf("%s: (not set)\n", lang)
+				continue
+			}
+			lines := strings.Split(string(data), "\n")
+			ver := ""
+			for _, line := range lines {
+				if strings.Contains(line, "/languages/") {
+					// 例: export GOROOT="$HOME/.kver/languages/go/1.21.0"
+					parts := strings.Split(line, "/languages/")
+					if len(parts) > 1 {
+						rest := parts[1]
+						restParts := strings.Split(rest, "/")
+						if len(restParts) >= 2 {
+							ver = restParts[1]
+							break
+						}
+					}
+				}
+			}
+			if ver != "" {
 				fmt.Printf("%s: %s (global)\n", lang, ver)
 			} else {
 				fmt.Printf("%s: (not set)\n", lang)
