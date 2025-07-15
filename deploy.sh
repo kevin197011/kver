@@ -43,13 +43,20 @@ mkdir -p "$INSTALL_DIR"
 curl -fsSL "$URL" -o "$INSTALL_DIR/$BIN_NAME"
 chmod +x "$INSTALL_DIR/$BIN_NAME"
 
-# 检查 PATH
-if ! echo "$PATH" | grep -q "$INSTALL_DIR"; then
-  echo
-  echo "[kver] Please add $INSTALL_DIR to your PATH:"
-  echo "  export PATH=\"$INSTALL_DIR:\$PATH\""
-  echo "  # Add above line to your ~/.bashrc or ~/.zshrc"
+# 自动写入 PATH 到 shell 配置
+SHELL_NAME="$(basename "$SHELL")"
+if [[ "$SHELL_NAME" == "zsh" ]]; then
+  RC_FILE="$HOME/.zshrc"
+else
+  RC_FILE="$HOME/.bashrc"
 fi
 
-echo
-echo "[kver] Install complete! Try: kver --help"
+EXPORT_LINE="export PATH=\"$INSTALL_DIR:\$PATH\""
+if ! grep -Fxq "$EXPORT_LINE" "$RC_FILE" 2>/dev/null; then
+  echo "$EXPORT_LINE" >> "$RC_FILE"
+  echo "[kver] Added $INSTALL_DIR to your PATH in $RC_FILE"
+else
+  echo "[kver] $INSTALL_DIR already in your PATH in $RC_FILE"
+fi
+
+echo "\n[kver] Install complete! Try: kver --help"
