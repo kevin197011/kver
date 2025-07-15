@@ -177,6 +177,10 @@ func copyDir(src, dst string) error {
 			return err
 		}
 		tgt := filepath.Join(dst, rel)
+		// 先删除目标，防止软链被覆盖成空文件
+		if _, err := os.Lstat(tgt); err == nil {
+			os.Remove(tgt)
+		}
 		if info.Mode()&os.ModeSymlink != 0 {
 			link, err := os.Readlink(path)
 			if err != nil {
