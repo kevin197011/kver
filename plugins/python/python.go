@@ -138,31 +138,49 @@ func (p *PythonPlugin) Install(version string) error {
 
 	// 自动补软链
 	binDir := filepath.Join(installDir, "bin")
-	pyMajor := strings.Split(version, ".")[0]
-	pyMinor := strings.Split(version, ".")[1]
-	py3Bin := filepath.Join(binDir, "python3")
-	pyBinShort := filepath.Join(binDir, "python")
-	pip3Bin := filepath.Join(binDir, "pip3")
-	pipBin := filepath.Join(binDir, "pip")
-	pipVerBin := filepath.Join(binDir, "pip"+pyMajor+"."+pyMinor)
+	parts := strings.Split(version, ".")
+	pyMajor := parts[0]
+	pyMinor := parts[1]
+	pyPatch := ""
+	if len(parts) > 2 {
+		pyPatch = parts[2]
+	}
+	pyVer := pyMajor + "." + pyMinor
+	if pyPatch != "" {
+		pyVer = pyVer + "." + pyPatch
+	}
+	pythonExe := "python" + pyMajor + "." + pyMinor
+	if pyPatch != "" {
+		pythonExe = "python" + pyMajor + "." + pyMinor + "." + pyPatch
+	}
+	pipExe := "pip" + pyMajor + "." + pyMinor
+	if pyPatch != "" {
+		pipExe = "pip" + pyMajor + "." + pyMinor + "." + pyPatch
+	}
 
-	// python3 -> python3.x
-	if _, err := os.Stat(py3Bin); os.IsNotExist(err) {
-		os.Symlink("python"+pyMajor+"."+pyMinor, py3Bin)
+	// python3 -> python3.x[.x]
+	if _, err := os.Stat(filepath.Join(binDir, "python3")); os.IsNotExist(err) {
+		if _, err2 := os.Stat(filepath.Join(binDir, pythonExe)); err2 == nil {
+			os.Symlink(pythonExe, filepath.Join(binDir, "python3"))
+		}
 	}
 	// python -> python3
-	if _, err := os.Stat(pyBinShort); os.IsNotExist(err) {
-		os.Symlink("python3", pyBinShort)
+	if _, err := os.Stat(filepath.Join(binDir, "python")); os.IsNotExist(err) {
+		if _, err2 := os.Stat(filepath.Join(binDir, "python3")); err2 == nil {
+			os.Symlink("python3", filepath.Join(binDir, "python"))
+		}
 	}
-	// pip3 -> pip3.x
-	if _, err := os.Stat(pip3Bin); os.IsNotExist(err) {
-		if _, err2 := os.Stat(pipVerBin); err2 == nil {
-			os.Symlink("pip"+pyMajor+"."+pyMinor, pip3Bin)
+	// pip3 -> pip3.x[.x]
+	if _, err := os.Stat(filepath.Join(binDir, "pip3")); os.IsNotExist(err) {
+		if _, err2 := os.Stat(filepath.Join(binDir, pipExe)); err2 == nil {
+			os.Symlink(pipExe, filepath.Join(binDir, "pip3"))
 		}
 	}
 	// pip -> pip3
-	if _, err := os.Stat(pipBin); os.IsNotExist(err) {
-		os.Symlink("pip3", pipBin)
+	if _, err := os.Stat(filepath.Join(binDir, "pip")); os.IsNotExist(err) {
+		if _, err2 := os.Stat(filepath.Join(binDir, "pip3")); err2 == nil {
+			os.Symlink("pip3", filepath.Join(binDir, "pip"))
+		}
 	}
 
 	title(fmt.Sprintf("Python %s installed successfully!", version))
