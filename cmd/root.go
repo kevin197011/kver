@@ -6,13 +6,25 @@ import (
 
 	"github.com/spf13/cobra"
 	// 注册插件
+	_ "kver/plugins/go"
+	_ "kver/plugins/python"
 	_ "kver/plugins/ruby"
 )
+
+const KverVersion = "0.1.0"
 
 var rootCmd = &cobra.Command{
 	Use:   "kver",
 	Short: "kver is a cross-language version manager",
 	Long:  "kver manages multiple versions of programming languages (Go, Python, Node.js, Ruby, etc.)",
+}
+
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Show kver version",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("kver version", KverVersion)
+	},
 }
 
 func Execute() {
@@ -23,5 +35,6 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.AddCommand(versionCmd)
 	// 这里可以添加 install/uninstall/list 等子命令
 }
