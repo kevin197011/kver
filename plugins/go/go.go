@@ -96,6 +96,8 @@ func (g *GoPlugin) Install(version string) error {
 
 	title("Step 3/4: Move to install directory")
 	os.RemoveAll(installDir)
+	// 确保父目录存在
+	os.MkdirAll(filepath.Dir(installDir), 0755)
 	if err := os.Rename(srcDir, installDir); err != nil {
 		return fmt.Errorf("failed to move go dir: %w", err)
 	}
