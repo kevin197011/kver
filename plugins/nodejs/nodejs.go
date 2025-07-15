@@ -37,12 +37,6 @@ func (n *NodejsPlugin) Install(version string) error {
 		}
 	}()
 
-	tmpDir, err := os.MkdirTemp("", "kver-nodejs-src-")
-	if err != nil {
-		return fmt.Errorf("failed to create temp dir: %w", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
 	title := func(s string) {
 		fmt.Printf("\n\033[1;36m[kver][nodejs] %s\033[0m\n", s)
 	}
@@ -50,7 +44,7 @@ func (n *NodejsPlugin) Install(version string) error {
 		fmt.Println("\033[1;34m----------------------------------------\033[0m")
 	}
 
-	title("Step 1/4: Download Node.js tarball")
+	title("Step 1/3: Download Node.js tarball")
 	osStr := runtime.GOOS
 	archStr := runtime.GOARCH
 	var nodeArch string
@@ -72,7 +66,7 @@ func (n *NodejsPlugin) Install(version string) error {
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("download failed: %s", resp.Status)
 	}
-	tarball := filepath.Join(tmpDir, filepath.Base(url))
+	tarball := filepath.Join(os.TempDir(), filepath.Base(url))
 	out, err := os.Create(tarball)
 	if err != nil {
 		return err
@@ -84,30 +78,29 @@ func (n *NodejsPlugin) Install(version string) error {
 	out.Close()
 	sep()
 
-	title("Step 2/4: Extract Node.js tarball")
-	if err := extractTarGz(tarball, tmpDir); err != nil {
+	title("Step 2/3: Extract Node.js tarball to install directory")
+	os.RemoveAll(installDir)
+	os.MkdirAll(filepath.Dir(installDir), 0755)
+	if err := extractTarGz(tarball, filepath.Dir(installDir)); err != nil {
 		return err
 	}
-	sep()
-
-	// 查找解压后的 node-v* 目录
-	srcDir := ""
-	dirs, _ := os.ReadDir(tmpDir)
+	// 解压后目录名如 node-vXX，重命名为 installDir
+	dirs, _ := os.ReadDir(filepath.Dir(installDir))
+	var extractedDir string
 	for _, d := range dirs {
 		if d.IsDir() && strings.HasPrefix(d.Name(), "node-v") {
-			srcDir = filepath.Join(tmpDir, d.Name())
+			extractedDir = filepath.Join(filepath.Dir(installDir), d.Name())
 			break
 		}
 	}
-	if srcDir == "" {
+	if extractedDir == "" {
 		return fmt.Errorf("failed to find extracted nodejs dir")
 	}
-
-	title("Step 3/4: Move to install directory")
-	os.RemoveAll(installDir)
-	os.MkdirAll(filepath.Dir(installDir), 0755)
-	if err := copyDir(srcDir, installDir); err != nil {
-		return fmt.Errorf("failed to copy nodejs dir: %w", err)
+	if extractedDir != installDir {
+		os.RemoveAll(installDir)
+		if err := os.Rename(extractedDir, installDir); err != nil {
+			return fmt.Errorf("failed to move extracted dir: %w", err)
+		}
 	}
 	sep()
 
@@ -120,7 +113,7 @@ func (n *NodejsPlugin) Install(version string) error {
 		return nil
 	})
 
-	title(fmt.Sprintf("Step 4/4: Node.js %s installed successfully!", version))
+	title(fmt.Sprintf("Step 3/3: Node.js %s installed successfully!", version))
 	fmt.Printf("[kver][nodejs] Installed at: %s\n", installDir)
 	sep()
 	installOk = true

@@ -24,7 +24,6 @@ var useCmd = &cobra.Command{
 			fmt.Printf("[kver] Use failed: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("[kver] Now using %s %s.\n", lang, version)
 	},
 }
 
