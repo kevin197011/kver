@@ -222,22 +222,11 @@ func (r *RubyPlugin) Uninstall(version string) error {
 	home, _ := os.UserHomeDir()
 	kverHome := filepath.Join(home, ".kver")
 	installDir := filepath.Join(kverHome, "languages", "ruby", version)
-	symlink := filepath.Join(kverHome, "versions", "ruby")
-
-	if _, err := os.Stat(installDir); os.IsNotExist(err) {
-		return fmt.Errorf("ruby version not installed: %s", version)
-	}
-
-	// 如果软链指向该版本，移除软链和 env.sh
-	if link, err := os.Readlink(symlink); err == nil && link == installDir {
-		os.Remove(symlink)
-		os.Remove(filepath.Join(kverHome, "env.sh"))
-	}
-
+	envFile := filepath.Join(kverHome, "env.d", "ruby.sh")
+	os.Remove(envFile)
 	if err := os.RemoveAll(installDir); err != nil {
 		return fmt.Errorf("failed to remove ruby version: %w", err)
 	}
-
 	fmt.Println("[kver] Ruby", version, "uninstalled.")
 	return nil
 }
@@ -292,28 +281,22 @@ func (r *RubyPlugin) Use(version string) error {
 	home, _ := os.UserHomeDir()
 	kverHome := filepath.Join(home, ".kver")
 	installDir := filepath.Join(kverHome, "languages", "ruby", version)
-	symlink := filepath.Join(kverHome, "versions", "ruby")
-
+	binDir := filepath.Join(installDir, "bin")
 	if _, err := os.Stat(installDir); os.IsNotExist(err) {
 		return fmt.Errorf("ruby version not installed: %s", version)
 	}
-
-	os.MkdirAll(filepath.Dir(symlink), 0755)
-	os.Remove(symlink)
-	if err := os.Symlink(installDir, symlink); err != nil {
-		return fmt.Errorf("failed to create symlink: %w", err)
-	}
-
-	envFile := filepath.Join(kverHome, "env.sh")
+	envDir := filepath.Join(kverHome, "env.d")
+	os.MkdirAll(envDir, 0755)
+	envFile := filepath.Join(envDir, "ruby.sh")
 	f, err := os.Create(envFile)
 	if err != nil {
-		return fmt.Errorf("failed to write env.sh: %w", err)
+		return err
 	}
 	defer f.Close()
-	f.WriteString(fmt.Sprintf("export RUBY_HOME=%s\nexport PATH=\"$RUBY_HOME/bin:$PATH\"\n", symlink))
-
-	fmt.Println("[kver] Now using Ruby", version)
-	fmt.Println("[kver] Please run: source ~/.kver/env.sh")
+	fmt.Fprintf(f, "export RUBY_HOME=\"%s\"\n", installDir)
+	fmt.Fprintf(f, "export PATH=\"%s:$PATH\"\n", binDir)
+	fmt.Println("[kver] Now using ruby", version)
+	fmt.Printf("[kver] Please run: source %s\n", filepath.Join(kverHome, "env.sh"))
 	return nil
 }
 
