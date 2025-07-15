@@ -136,6 +136,35 @@ func (p *PythonPlugin) Install(version string) error {
 	}
 	sep()
 
+	// 自动补软链
+	binDir := filepath.Join(installDir, "bin")
+	pyMajor := strings.Split(version, ".")[0]
+	pyMinor := strings.Split(version, ".")[1]
+	py3Bin := filepath.Join(binDir, "python3")
+	pyBinShort := filepath.Join(binDir, "python")
+	pip3Bin := filepath.Join(binDir, "pip3")
+	pipBin := filepath.Join(binDir, "pip")
+	pipVerBin := filepath.Join(binDir, "pip"+pyMajor+"."+pyMinor)
+
+	// python3 -> python3.x
+	if _, err := os.Stat(py3Bin); os.IsNotExist(err) {
+		os.Symlink("python"+pyMajor+"."+pyMinor, py3Bin)
+	}
+	// python -> python3
+	if _, err := os.Stat(pyBinShort); os.IsNotExist(err) {
+		os.Symlink("python3", pyBinShort)
+	}
+	// pip3 -> pip3.x
+	if _, err := os.Stat(pip3Bin); os.IsNotExist(err) {
+		if _, err2 := os.Stat(pipVerBin); err2 == nil {
+			os.Symlink("pip"+pyMajor+"."+pyMinor, pip3Bin)
+		}
+	}
+	// pip -> pip3
+	if _, err := os.Stat(pipBin); os.IsNotExist(err) {
+		os.Symlink("pip3", pipBin)
+	}
+
 	title(fmt.Sprintf("Python %s installed successfully!", version))
 	fmt.Printf("[kver][python] Installed at: %s\n", installDir)
 	sep()
