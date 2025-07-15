@@ -11,7 +11,8 @@ import (
 	_ "kver/plugins/ruby"
 )
 
-const KverVersion = "0.1.0"
+// KverVersion 由构建时 -ldflags 注入，默认 unknown
+var KverVersion = "unknown"
 
 var rootCmd = &cobra.Command{
 	Use:   "kver",

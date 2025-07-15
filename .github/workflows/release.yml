@@ -32,7 +32,8 @@ jobs:
       - name: Build binary
         run: |
           mkdir -p dist
-          go build -o dist/kver-${{ matrix.os }}-${{ matrix.arch }}
+          GIT_TAG=$(git describe --tags --abbrev=0)
+          go build -ldflags "-X kver/cmd.KverVersion=$GIT_TAG" -o dist/kver-${{ matrix.os }}-${{ matrix.arch }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
