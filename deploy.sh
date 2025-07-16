@@ -75,6 +75,15 @@ else
   echo "[kver] env.sh already sourced in $RC_FILE"
 fi
 
+# 确保 ~/.kver/bin 在 PATH 中
+BIN_EXPORT_LINE='export PATH="$HOME/.kver/bin:$PATH"'
+if ! grep -Fxq "$BIN_EXPORT_LINE" "$RC_FILE" 2>/dev/null; then
+  echo "$BIN_EXPORT_LINE" >> "$RC_FILE"
+  echo "[kver] Added ~/.kver/bin to PATH in $RC_FILE"
+else
+  echo "[kver] ~/.kver/bin already in PATH in $RC_FILE"
+fi
+
 # 自动写入 kver shell function，彻底防重复且可升级
 KVER_FUNC_MARK_START='# >>> kver shell function >>>'
 KVER_FUNC_MARK_END='# <<< kver shell function <<<'
